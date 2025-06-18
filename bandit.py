@@ -1,10 +1,9 @@
+# bandit.py
+
 from typing import Dict, Any, List, Tuple, Optional
 import numpy as np
 from environment import ENV_REGISTRY, BaseEnvironment
 from model import TRACKER_REGISTRY, ALGO_REGISTRY, BaseTracker
-
-defctor = Dict[str, Any]
-
 
 class Bandit:
     def __init__(
@@ -24,12 +23,15 @@ class Bandit:
         if tracker_name:
             if tracker_name not in TRACKER_REGISTRY:
                 raise ValueError(f"Unknown tracker: {tracker_name}")
-            self.tracker = TRACKER_REGISTRY[tracker_name](self.env.num_arms, **(tracker_args or {}))
+            self.tracker = TRACKER_REGISTRY[tracker_name](
+                self.env.num_arms, **(tracker_args or {})
+            )
 
         if algo_name not in ALGO_REGISTRY:
             raise ValueError(f"Unknown algorithm: {algo_name}")
         self.algo_cls = ALGO_REGISTRY[algo_name]
 
+        # build args for algorithm
         self.algo_args: Dict[str, Any] = {"env": self.env, "confidence": algo_args.get("confidence")}
         for key, val in algo_args.items():
             if key != "confidence":
@@ -37,10 +39,17 @@ class Bandit:
         if self.tracker:
             self.algo_args["tracker"] = self.tracker
 
-    def run(self) -> Tuple[int, np.ndarray, np.ndarray]:
+    def run(self) -> Tuple[int, np.ndarray, np.ndarray, List[np.ndarray]]:
+        """
+        Returns:
+          best_arm: int
+          counts:   np.ndarray, shape (K,)
+          rewards:  np.ndarray, shape (K,)
+          history:  List of np.ndarray fractions (counts / total pulls) after each pull
+        """
         algo = self.algo_cls(**self.algo_args)
         return algo.run()
 
-    def run_n(self, n: int) -> List[Tuple[int, np.ndarray, np.ndarray]]:
+    def run_n(self, n: int) -> List[Tuple[int, np.ndarray, np.ndarray, List[np.ndarray]]]:
         """Run n independent trials"""
         return [self.run() for _ in range(n)]
