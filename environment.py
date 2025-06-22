@@ -4,12 +4,61 @@ from typing import List, Any, Dict
 import numpy as np
 
 class BaseEnvironment:
-    """Abstract base."""
     def __init__(self, num_arms: int):
         self.num_arms = num_arms
 
     def sample(self, arm: int) -> float:
         raise NotImplementedError
+
+    def to_dict(self) -> Dict[str, Any]:
+        # figure out our registry key
+        from environment import ENV_REGISTRY
+        for name, cls in ENV_REGISTRY.items():
+            if isinstance(self, cls):
+                env_name = name
+                break
+        else:
+            raise ValueError("Unknown environment class")
+
+        state: Dict[str, Any] = {}
+        if env_name == "bernoulli":
+            state["probs"] = list(self.probs)
+        elif env_name == "normal":
+            state["mu"]    = list(self.mu)
+            state["sigma"] = float(self.sigma)
+        else:
+            raise ValueError(f"Cannot serialize env {env_name!r}")
+
+        return {"env_name": env_name, "state": state}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BaseEnvironment":
+        """
+        Reconstruct an environment from the dict produced by to_dict().
+        """
+        from environment import ENV_REGISTRY
+
+        env_name = data["env_name"]
+        state    = data["state"]
+
+        if env_name not in ENV_REGISTRY:
+            raise ValueError(f"Unknown env_name in saved data: {env_name}")
+
+        EnvCls = ENV_REGISTRY[env_name]
+        # bypass __init__
+        env = object.__new__(EnvCls)
+
+        if env_name == "bernoulli":
+            env.probs    = state["probs"]
+            env.num_arms = len(env.probs)
+        elif env_name == "normal":
+            env.mu       = state["mu"]
+            env.sigma    = state["sigma"]
+            env.num_arms = len(env.mu)
+        else:
+            raise ValueError(f"Cannot load env {env_name!r}")
+
+        return env
 
 class BernoulliEnvironment(BaseEnvironment):
     """
@@ -51,7 +100,7 @@ class BernoulliEnvironment(BaseEnvironment):
                 else:
                     probs.append(base + np.random.uniform(-0.01, 0.01))
         elif env_type == "linear":
-            probs = list(np.linspace(0.2, 0.8, num=K))
+            probs = [0.5, 0, 0 ,0, 0]
         else:
             raise ValueError(f"Unknown env_type: {env_type}")
         return [float(np.clip(p, 1e-3, 1 - 1e-3)) for p in probs]
@@ -88,7 +137,7 @@ class NormalEnvironment(BaseEnvironment):
                 else:
                     mus.append(base + np.random.uniform(-0.1, 0.1))
         elif env_type == "linear":
-            mus = list(np.linspace(0.0, 3.0, num=K))
+            mus = list(np.linspace(0.0, 1.0, num=K))
         else:
             raise ValueError(f"Unknown env_type: {env_type}")
         return mus

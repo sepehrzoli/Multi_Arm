@@ -16,9 +16,9 @@ def _compute_w_star(
     mu: Sequence[float],
     *,
     env: BaseEnvironment,
-    tol: float = 1e-9,
-    max_iter_outer: int = 60,
-    max_iter_inner: int = 60
+    tol: float = 1e-3,
+    max_iter_outer: int = 12,
+    max_iter_inner: int = 12
 ) -> np.ndarray:
     if env.__class__.__name__.lower().startswith("normal"):
         sigma2 = float(getattr(env, "sigma", 1.0) ** 2)

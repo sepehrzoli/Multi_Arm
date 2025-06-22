@@ -11,7 +11,13 @@ class BaseTracker:
         raise NotImplementedError
 
 class BaseAlgorithm:
-    def __init__(self, env: BaseEnvironment, confidence: float, tracker: Optional[BaseTracker] = None, **kwargs):
+    def __init__(
+        self,
+        env: BaseEnvironment,
+        confidence: float,
+        tracker: Optional[BaseTracker] = None,
+        **kwargs
+    ):
         self.env = env
         self.confidence = confidence
         self.tracker = tracker
@@ -19,9 +25,11 @@ class BaseAlgorithm:
     def run(self):
         raise NotImplementedError
 
-# import the two implementations so registries can reference them
+
 from track_and_stop import CTracking, DTracking, TrackAndStop
 from exp_gap_elim import ExpGapElimination
+from lil_ucb import LilUCB
+
 
 TRACKER_REGISTRY: Dict[str, Type[BaseTracker]] = {
     "c_tracking": CTracking,
@@ -31,4 +39,5 @@ TRACKER_REGISTRY: Dict[str, Type[BaseTracker]] = {
 ALGO_REGISTRY: Dict[str, Type[BaseAlgorithm]] = {
     "track_and_stop": TrackAndStop,
     "exp_gap_elim": ExpGapElimination,
+    "lil_ucb": LilUCB,
 }
