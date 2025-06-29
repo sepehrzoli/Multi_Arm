@@ -6,23 +6,41 @@ from environment import BaseEnvironment
 from model import BaseAlgorithm
 from stopping_conditions import BaseStoppingCondition
 
-
 class LilUCB(BaseAlgorithm):
     def __init__(
         self,
         env: BaseEnvironment,
         confidence: float,
-        stopping_condition: BaseStoppingCondition
+        stopping_condition: BaseStoppingCondition,
+        epsilon: float = 0.01,
+        beta: float = 1,
+        lambda_param: float = 9.0
     ):
+        # store ν
         super().__init__(env=env, confidence=confidence)
+        self.v = confidence
         self.stopping_condition = stopping_condition
 
-    def _bonus(self, n: int) -> float:
-        δ = self.confidence
-        numerator = np.log(1.01 * n + 2)
-        denom = ((1/1005) * δ) ** (1 / 1.01)
-        inner = np.log(numerator / denom)
-        return 2.2 * np.sqrt((0.505 / n) * inner)
+        # algorithm params
+        self.epsilon = epsilon
+        self.beta = beta
+        self.lambda_param = lambda_param
+
+
+        c_e = (
+                      ((2.0 + self.epsilon) / self.epsilon)
+                      * (1.0 / np.log(1.0 + self.epsilon))
+              ) ** (1.0 + self.epsilon)
+
+        self.delta = (
+                (np.sqrt(1.0 + self.v) - 1.0) ** 2
+                / (4.0 * c_e)
+        )
+
+        if hasattr(env, "sigma"):
+            self.sigma2 = float(env.sigma ** 2)
+        else:
+            self.sigma2 = 0.25
 
     def run(self) -> Tuple[int, np.ndarray, np.ndarray, List[np.ndarray]]:
         K = self.env.num_arms
@@ -30,22 +48,34 @@ class LilUCB(BaseAlgorithm):
         rewards = np.zeros(K, dtype=float)
         history: List[np.ndarray] = []
 
-        for a in range(K):
-            r = self.env.sample(a)
-            counts[a] += 1
-            rewards[a] += r
+        for i in range(K):
+            r = self.env.sample(i)
+            counts[i] += 1
+            rewards[i] += r
             history.append(counts / counts.sum())
 
         while not self.stopping_condition.should_stop(
-            counts, rewards, self.env, self.confidence
+            counts, rewards, self.env, self.v
         ):
-            mu_hat  = rewards / np.maximum(1, counts)
-            bonuses = np.array([self._bonus(counts[i]) for i in range(K)])
-            arm     = int(np.argmax(mu_hat + bonuses))
+            p_hat = rewards / counts
+            total = counts.sum()
 
-            r = self.env.sample(arm)
-            counts[arm]  += 1
-            rewards[arm] += r
+            scores = np.empty(K, dtype=float)
+            for i in range(K):
+                Ti = counts[i]
+                inner = np.log((1.0 + self.epsilon) * Ti)
+                term = np.log(inner / self.delta)
+                bonus = (
+                    (1.0 + self.beta)
+                    * (1.0 + np.sqrt(self.epsilon))
+                    * np.sqrt(2.0 * self.sigma2 * (1.0 + self.epsilon) * term / Ti)
+                )
+                scores[i] = p_hat[i] + bonus
+
+            I_t = int(np.argmax(scores))
+            r = self.env.sample(I_t)
+            counts[I_t]  += 1
+            rewards[I_t] += r
             history.append(counts / counts.sum())
 
         best = int(np.argmax(counts))

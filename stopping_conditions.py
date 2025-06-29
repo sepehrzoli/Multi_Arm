@@ -88,9 +88,83 @@ class LilStoppingCondition(BaseStoppingCondition):
         rhs = np.max(np.delete(mu_hat + Bs, i_hat))
         return lhs >= rhs
 
-# add to registry
+# stopping_conditions.py
+
+import math
+import numpy as np
+from environment import BaseEnvironment
+
+class LUCBStoppingCondition(BaseStoppingCondition):
+    def __init__(self, epsilon: float = 0.02):
+        # epsilon here is the required precision gap before stopping
+        self.epsilon = epsilon
+        # constant from the paper
+        self.k1 = 5.0 / 4.0
+
+    def should_stop(
+        self,
+        counts: np.ndarray,
+        rewards: np.ndarray,
+        env: BaseEnvironment,
+        confidence: float
+    ) -> bool:
+        K = counts.size
+        if np.any(counts < 1):
+            return False
+
+        p_hat = rewards / counts
+        t = int(counts.sum())
+        δ = confidence
+
+        betas = np.zeros(K, dtype=float)
+        for i in range(K):
+            u = counts[i]
+            if u <= 0:
+                continue
+            arg = self.k1 * K * (t ** 4) / δ
+            betas[i] = math.sqrt((1.0 / (2.0 * u)) * math.log(arg))
+
+        h_star = int(np.argmax(p_hat))
+        scores = p_hat + betas
+        scores[h_star] = -np.inf
+        l_star = int(np.argmax(scores))
+
+        lhs = p_hat[l_star] + betas[l_star]
+        rhs = p_hat[h_star] - betas[h_star]
+        return (lhs - rhs) < self.epsilon
+
+
+class LSAndLUCBStoppingCondition(BaseStoppingCondition):
+
+    def __init__(
+        self,
+        lil_eps: float = 0.01,
+        lucb_epsilon: float = 0.0
+    ):
+        from stopping_conditions import LilStoppingCondition, LUCBStoppingCondition
+        self.ls   = LilStoppingCondition(eps=lil_eps)
+        self.lucb = LUCBStoppingCondition(epsilon=lucb_epsilon)
+
+    def should_stop(
+        self,
+        counts: np.ndarray,
+        rewards: np.ndarray,
+        env: BaseEnvironment,
+        confidence: float
+    ) -> bool:
+        δ_ls   = confidence / 2.0
+        δ_lucb = confidence / 2.0
+
+        ok_ls   = self.ls.should_stop(counts, rewards, env, δ_ls)
+        ok_lucb = self.lucb.should_stop(counts, rewards, env, δ_lucb)
+        return ok_ls or ok_lucb
+
+
+# update registry:
 STOPPING_CONDITION_REGISTRY: Dict[str, Any] = {
     "chernoff":          ChernoffStoppingCondition,
     "lil_ucb_original":  LilUCBStoppingCondition,
     "lil_stopping":      LilStoppingCondition,
+    "lucb":              LUCBStoppingCondition,
+    "ls_and_lucb":       LSAndLUCBStoppingCondition,
 }

@@ -26,18 +26,31 @@ class BaseAlgorithm:
         raise NotImplementedError
 
 
-from track_and_stop import CTracking, DTracking, TrackAndStop
 from exp_gap_elim import ExpGapElimination
 from lil_ucb import LilUCB
+from lucb1 import LUCB1
+from gradient_ascent import GradientAscent
 
-
+from track_and_stop import (
+    CTracking, DTracking, HeuristicTracking, GTracking,
+    DOracleTracking, RealOracleTracking, TrackAndStop
+)
+from Frank_Wolfe import FWS
 TRACKER_REGISTRY: Dict[str, Type[BaseTracker]] = {
-    "c_tracking": CTracking,
-    "d_tracking": DTracking,
+    "c_tracking":            CTracking,
+    "d_tracking":            DTracking,
+    "heuristic_tracking":    HeuristicTracking,
+    "g_tracking":            GTracking,
+    "d_oracle_tracking":     DOracleTracking,
+    "real_oracle_tracking":  RealOracleTracking,
 }
 
 ALGO_REGISTRY: Dict[str, Type[BaseAlgorithm]] = {
-    "track_and_stop": TrackAndStop,
-    "exp_gap_elim": ExpGapElimination,
-    "lil_ucb": LilUCB,
+    "track_and_stop":   TrackAndStop,
+    "exp_gap_elim":     ExpGapElimination,
+    "lil_ucb":          LilUCB,
+    "lucb":             LUCB1,
+    "lazyma":  GradientAscent,
+    "fws": FWS
 }
+
