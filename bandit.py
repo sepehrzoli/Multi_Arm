@@ -49,7 +49,7 @@ class Bandit:
             self.save_env(path)
             print(f"[Bandit] auto-saved environment to {path}")
 
-        # ── 2) Tracker (for TrackAndStop only) ────────────
+        # ── 2) Tracker (for TrackAndStop + Optimistic Track and Stop only) ────────────
         self.tracker: Optional[BaseTracker] = None
         if tracker_name:
             if tracker_name not in TRACKER_REGISTRY:
@@ -58,7 +58,7 @@ class Bandit:
                 self.env.num_arms, **(tracker_args or {})
             )
 
-        # ── 3) Stopping condition (for TrackAndStop & LilUCB) ───
+        # ── 3) Stopping condition ───
         self.stopping: Optional[BaseStoppingCondition] = None
         if stopping_name:
             if stopping_name not in STOPPING_CONDITION_REGISTRY:
@@ -91,6 +91,12 @@ class Bandit:
 
     def run_n(self, n: int) -> List[Tuple[int, np.ndarray, np.ndarray, List[np.ndarray]]]:
         return [self.run() for _ in range(n)]
+
+    def run_fixed(self, horizon: int) -> np.ndarray:
+        algo = self.algo_cls(**self.algo_args)
+        if not hasattr(algo, 'run_fixed'):
+            raise ValueError(f"{self.algo_cls.__name__} does not support fixed‑horizon runs")
+        return algo.run_fixed(horizon)
 
     # ── Serialization ────────────────────────────────
 

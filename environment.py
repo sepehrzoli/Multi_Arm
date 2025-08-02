@@ -100,10 +100,33 @@ class BernoulliEnvironment(BaseEnvironment):
                 else:
                     probs.append(base + np.random.uniform(-0.01, 0.01))
         elif env_type == "linear":
-            probs = [0.5, 0, 0 ,0, 0]
+            # linearly spaced probabilities between 0 and 1 (excluding extremes slightly)
+            probs = list(np.linspace(0.0, 1.0, num=K))
+        elif env_type == "1_sparse":
+            # one arm with probability 1/2, others 0
+            if K < 1:
+                raise ValueError("Need at least 1 arm for 1_sparse")
+            probs = [0.0] * K
+            probs[0] = 0.5  # best is first
+        elif env_type.startswith("alpha_"):
+            # expect num_arms = n + 1, with mu_0 = 1, and for i=1..n: mu_i = 1 - (i/n)^alpha
+            try:
+                alpha = float(env_type.split("_")[1])
+            except Exception:
+                raise ValueError(f"Invalid alpha scenario name: {env_type}")
+            if K < 2:
+                raise ValueError(f"Need at least 2 arms for {env_type}")
+            n = K - 1
+            mus = [1.0]  # arm 0
+            for i in range(1, n + 1):
+                val = 1.0 - (i / n) ** alpha
+                mus.append(val)
+            probs = mus
         else:
             raise ValueError(f"Unknown env_type: {env_type}")
+        # clip and guarantee in (0,1)
         return [float(np.clip(p, 1e-3, 1 - 1e-3)) for p in probs]
+
 
     def sample(self, arm: int) -> float:
         return float(np.random.rand() < self.probs[arm])
@@ -138,9 +161,26 @@ class NormalEnvironment(BaseEnvironment):
                     mus.append(base + np.random.uniform(-0.1, 0.1))
         elif env_type == "linear":
             mus = list(np.linspace(0.0, 1.0, num=K))
+        elif env_type == "1_sparse":
+            if K < 1:
+                raise ValueError("Need at least 1 arm for 1_sparse")
+            mus = [0.5] + [0.0] * (K - 1)
+        elif env_type.startswith("alpha_"):
+            try:
+                alpha = float(env_type.split("_")[1])
+            except Exception:
+                raise ValueError(f"Invalid alpha scenario name: {env_type}")
+            if K < 2:
+                raise ValueError(f"Need at least 2 arms for {env_type}")
+            n = K - 1
+            mus = [1.0]
+            for i in range(1, n + 1):
+                val = 1.0 - (i / n) ** alpha
+                mus.append(val)
         else:
             raise ValueError(f"Unknown env_type: {env_type}")
         return mus
+
 
     def sample(self, arm: int) -> float:
         return float(np.random.randn() * self.sigma + self.mu[arm])

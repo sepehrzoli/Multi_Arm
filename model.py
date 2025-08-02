@@ -1,6 +1,7 @@
 # model.py
 
 from typing import Type, Dict, Optional
+
 from environment import BaseEnvironment
 
 class BaseTracker:
@@ -33,9 +34,12 @@ from gradient_ascent import GradientAscent
 
 from track_and_stop import (
     CTracking, DTracking, HeuristicTracking, GTracking,
-    DOracleTracking, RealOracleTracking, TrackAndStop
+    DOracleTracking, RealOracleTracking, TrackAndStop, BestChallengerTracking, OptimisticTracking, NoisyTracking
 )
+from track_and_stop import SamplingTracking
 from Frank_Wolfe import FWS
+from Top_Two import TopTwoBAI
+from AdaHedge import AdaHedgeBestResponse
 TRACKER_REGISTRY: Dict[str, Type[BaseTracker]] = {
     "c_tracking":            CTracking,
     "d_tracking":            DTracking,
@@ -43,6 +47,10 @@ TRACKER_REGISTRY: Dict[str, Type[BaseTracker]] = {
     "g_tracking":            GTracking,
     "d_oracle_tracking":     DOracleTracking,
     "real_oracle_tracking":  RealOracleTracking,
+    "sampling_tracking": SamplingTracking,
+    "bc": BestChallengerTracking,
+    "optimistic_tracking" : OptimisticTracking,
+    "noisy_tracking" : NoisyTracking
 }
 
 ALGO_REGISTRY: Dict[str, Type[BaseAlgorithm]] = {
@@ -51,6 +59,8 @@ ALGO_REGISTRY: Dict[str, Type[BaseAlgorithm]] = {
     "lil_ucb":          LilUCB,
     "lucb":             LUCB1,
     "lazyma":  GradientAscent,
-    "fws": FWS
+    "fws": FWS,
+    "top_two": TopTwoBAI,
+    "adahedge_br": AdaHedgeBestResponse,
 }
 

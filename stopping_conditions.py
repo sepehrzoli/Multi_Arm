@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 import numpy as np
 from typing import Dict, Any
@@ -15,41 +17,93 @@ class BaseStoppingCondition:
         raise NotImplementedError
 
 class ChernoffStoppingCondition(BaseStoppingCondition):
-    def should_stop(self, counts, rewards, env, confidence):
-        # exactly the old TrackAndStop _stop_condition
-        if env.__class__.__name__.lower().startswith("normal"):
-            sigma2 = float(getattr(env, "sigma", 1.0) ** 2)
+    def __init__(self, mode: str = "practice", tol: float = 1e-5):
+        if mode not in ("theory", "practice"):
+            raise ValueError("mode must be 'theory' or 'practice'")
+        self.mode = mode
+        self.tol = tol
+
+    def compute_statistic(
+        self,
+        counts: np.ndarray,
+        rewards: np.ndarray,
+        env: BaseEnvironment
+    ) -> float:
+        """Compute the Chernoff ‘worst’ statistic (without the beta threshold)."""
+        K = counts.size
+        if np.sum(counts) < K:
+            return 0.0
+
+        # choose KL divergence
+        if hasattr(env, "sigma"):
+            sigma2 = float(env.sigma) ** 2
             kl = lambda p, q: _kl_gaussian(p, q, sigma2)
         else:
             kl = _kl_bernoulli
 
-        t = int(counts.sum())
+        mu_hat = rewards / counts
+        max_mu = mu_hat.max()
+        best_arms = [i for i in range(K) if mu_hat[i] >= max_mu - self.tol]
+        best = int(np.random.choice(best_arms))
+
+        NB, SB = counts[best], rewards[best]
+        muB = SB / NB
+        worst = math.inf
+        for i in range(K):
+            if i == best:
+                continue
+            n_ab = NB + counts[i]
+            mix = (NB * muB + counts[i] * mu_hat[i]) / n_ab
+            val = NB * kl(muB, mix) + counts[i] * kl(mu_hat[i], mix)
+            worst = min(worst, val)
+        return worst
+
+    def should_stop(
+        self,
+        counts: np.ndarray,
+        rewards: np.ndarray,
+        env: BaseEnvironment,
+        confidence: float
+    ) -> bool:
         K = counts.size
+        t = int(counts.sum())
         if t < K:
             return False
 
-        mu_hat = rewards / np.maximum(1, counts)
-        Z = -math.inf
-        for a in range(K):
-            worst = math.inf
-            for b in range(K):
-                if a == b:
-                    continue
-                n_ab = counts[a] + counts[b]
-                mix = (counts[a]*mu_hat[a] + counts[b]*mu_hat[b]) / n_ab
-                val = counts[a]*kl(mu_hat[a], mix) + counts[b]*kl(mu_hat[b], mix)
-                worst = min(worst, val)
-            Z = max(Z, worst)
+        worst = self.compute_statistic(counts, rewards, env)
 
-        beta = math.log((math.log(t)+1) / confidence)
-        return Z > beta
+        if self.mode == "practice":
+            beta = math.log((math.log(t) + 1) / confidence)
+        else:  # theory
+            if not hasattr(env, "sigma"):
+                # normal environment: complex theoretical threshold
+                x = 0.5 * math.log((K - 1) / confidence)
+                C_exp = x + 4 * math.log(1 + x + math.sqrt(2 * x))
+                beta = 6 * math.log(math.log(t / 2) + 1) + 2 * C_exp
+            else:
+                # Bernoulli case: simpler theory threshold
+                beta = 4 * math.log(math.log(t / 2) + 4)
+
+        return worst > beta
+
 
 class LilUCBStoppingCondition(BaseStoppingCondition):
-    def should_stop(self, counts, rewards, env, confidence):
-        # original Lil'UCB stop: while all(counts[i] < 1 + 9*(total - counts[i]))
+    def __init__(self, lambda_param: float | None = None):
+        # default to theory lambda (beta=1): ((2+1)/1)^2 = 9
+        if lambda_param is None:
+            self.lambda_param = ((2.0 + 1.0) / 1.0) ** 2
+        else:
+            self.lambda_param = lambda_param
+
+    def should_stop(self, counts: np.ndarray, rewards: np.ndarray, env, confidence):
         K = counts.size
         total = counts.sum()
-        return not all(counts[i] < 1 + 9 * (total - counts[i]) for i in range(K))
+        # Continue while for all i: T_i < 1 + lambda * sum_{j != i} T_j
+        # So stop when exists i with T_i >= 1 + lambda * (total - T_i)
+        return any(
+            counts[i] >= 1 + self.lambda_param * (total - counts[i])
+            for i in range(K)
+        )
 
 class LilStoppingCondition(BaseStoppingCondition):
     def __init__(self, eps: float = 0.01):
@@ -159,6 +213,39 @@ class LSAndLUCBStoppingCondition(BaseStoppingCondition):
         ok_lucb = self.lucb.should_stop(counts, rewards, env, δ_lucb)
         return ok_ls or ok_lucb
 
+class TopTwoStoppingCondition(BaseStoppingCondition):
+    def should_stop(self,
+                    counts: np.ndarray,
+                    rewards: np.ndarray,
+                    env: BaseEnvironment,
+                    confidence: float) -> bool:
+        K = counts.size
+        t = int(counts.sum())
+        n = int(counts.sum())
+        if n < K:
+            return False
+        mu_hat = rewards / counts
+        i_hat = int(np.argmax(mu_hat))
+        def transport_cost(i: int, j: int) -> float:
+            N_i, N_j = counts[i], counts[j]
+            mu_i, mu_j = mu_hat[i], mu_hat[j]
+            x_star = (N_i * mu_i + N_j * mu_j) / (N_i + N_j)
+            if hasattr(env, 'probs'):
+                return N_i * _kl_bernoulli(mu_i, x_star) + N_j * _kl_bernoulli(mu_j, x_star)
+            else:
+                return (N_i * N_j / (2 * float(env.sigma)**2 * (N_i + N_j))) * (mu_i - mu_j)**2
+        minW = math.inf
+        for j in range(K):
+            if j == i_hat:
+                continue
+            w = transport_cost(i_hat, j)
+            minW = min(minW, w)
+
+        if hasattr(env, 'probs'):
+            threshold = math.log(2 * t * (K - 1) / confidence)
+        else:
+            threshold = math.log((K - 1)/confidence) + 0.5*math.log(1 + math.log(n))
+        return minW > threshold
 
 # update registry:
 STOPPING_CONDITION_REGISTRY: Dict[str, Any] = {
@@ -167,4 +254,5 @@ STOPPING_CONDITION_REGISTRY: Dict[str, Any] = {
     "lil_stopping":      LilStoppingCondition,
     "lucb":              LUCBStoppingCondition,
     "ls_and_lucb":       LSAndLUCBStoppingCondition,
+    "top_two": TopTwoStoppingCondition,
 }
