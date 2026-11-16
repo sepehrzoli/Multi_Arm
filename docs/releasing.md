@@ -7,6 +7,8 @@ notes to `CHANGELOG.md`, run the development checks, and commit the changes.
 Create an annotated `v<version>` tag and push it. `release.yml` checks the tag,
 builds source/wheel distributions, validates their metadata, tests the installed
 wheel, and publishes the files in a GitHub release.
+To retry an interrupted GitHub publication, run **Actions → GitHub release → Run
+workflow** from the default branch and enter the existing release tag.
 
 ## One-time PyPI setup
 
