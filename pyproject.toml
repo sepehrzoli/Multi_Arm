@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "best_arm"
+version = "0.1.1"
+description = "A modular multi-armed bandit framework with algorithms, trackers, and stopping rules."
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Sepehr Zolfaghari" },
+]
+dependencies = [
+    "numpy>=1.23",
+    "matplotlib>=3.7",
+    "scipy>=1.10,<1.13",
+]
+
+[project.optional-dependencies]
+dev = ["ruff==0.17.3", "build>=1.2", "setuptools>=77", "wheel"]
+
+[project.urls]
+Homepage = "https://github.com/sepehrzoli/Multi_Arm"
+Issues = "https://github.com/sepehrzoli/Multi_Arm/issues"
+
+[project.scripts]
+multi-arm = "best_arm.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["best_arm*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+include = ["src/**/*.py", "examples/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+# Mathematical symbols, KL callables, and intermediate calculations are retained.
+ignore = ["E731", "E741", "F841"]
+
+[tool.ruff.lint.per-file-ignores]
+# Algorithms import these base classes before the registries can be populated.
+"src/best_arm/model.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

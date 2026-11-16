@@ -1,0 +1,4 @@
+{
+  "env_name": "normal",
+  "state": {"mu": [0.0, 1.5, 0.5], "sigma": 1.0}
+}
