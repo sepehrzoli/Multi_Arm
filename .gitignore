@@ -26,6 +26,7 @@ tmp/
 logs/
 *.log
 *.zip
+boxplot_*.png
 
 # Local research material and unpublished drafts
 paper/
