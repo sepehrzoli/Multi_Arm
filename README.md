@@ -11,8 +11,29 @@ SciPy, and Matplotlib.
 
 ## Install
 
-Use **Python 3.9–3.12** (the current SciPy dependency range supports these versions).
-Clone the repository and install it in a virtual environment:
+Use **Python 3.9–3.12**. Install the current GitHub release directly with pip;
+you do not need to clone the repository or install Git:
+
+```bash
+python -m pip install --upgrade "https://github.com/sepehrzoli/Multi_Arm/archive/refs/tags/v0.1.2.zip"
+```
+
+Then import it from any Python script or notebook:
+
+```python
+from best_arm import Bandit, BernoulliEnvironment, run_experiment
+import best_arm
+
+print(best_arm.__version__)  # 0.1.2
+```
+
+The distribution name is `best-arm`; the Python import name is `best_arm`.
+The project also has a [PyPI page](https://pypi.org/project/best-arm/), where
+`python -m pip install --upgrade best-arm` installs the latest **PyPI** release.
+Use the versioned GitHub command above to get exactly this release.
+
+To edit the code or run the repository's example scripts, clone it and create
+a virtual environment:
 
 ```bash
 git clone https://github.com/sepehrzoli/Multi_Arm.git
@@ -46,15 +67,20 @@ set a NumPy seed, so results can be reproduced within the same dependency versio
 
 ## First experiment
 
-Run this from the repository root after installation:
+This example works from **any directory** after installation, with no downloaded
+data files or repository checkout:
 
 ```python
 import numpy as np
-from best_arm import Bandit
+from best_arm import Bandit, BaseEnvironment
 
 np.random.seed(7)
-bandit = Bandit.from_saved_env(
-    path="examples/environments/bernoulli.json",
+environment = BaseEnvironment.from_dict({
+    "env_name": "bernoulli",
+    "state": {"probs": [0.2, 0.8, 0.4]},
+})
+bandit = Bandit(
+    env_instance=environment,
     algo_name="track_and_stop",
     algo_args={"confidence": 0.1},
     tracker_name="d_tracking",
@@ -117,6 +143,7 @@ run from any working directory after the package is installed.
 
 | Example | Command | What it demonstrates |
 | --- | --- | --- |
+| Standalone library | `python examples/library_usage.py` | Import and run the installed library without repository data files |
 | Quickstart | `python examples/quickstart.py` | One stopped Bernoulli run and one fixed-budget run |
 | Gaussian rewards | `python examples/gaussian.py` | Gaussian environment, variance, and the Gaussian-only `pmax` method |
 | Repeated experiments | `python examples/repeated_runs.py` | Summary statistics and the `run_experiment` Python API |
@@ -234,7 +261,8 @@ python -m build
 ```
 
 Smoke tests cover registered algorithms on small Bernoulli/Gaussian problems,
-the CLI, saved-environment round trips, and executable examples. CI runs the
+the CLI, saved-environment round trips, standalone installed-library use, and
+executable examples. CI runs the
 checks on Python 3.9 and 3.12, including a Windows job.
 
 ```text
@@ -248,6 +276,9 @@ The public repository includes the code, examples, tests, packaging metadata,
 and documentation needed to install and try the framework. Virtual environments,
 editor settings, generated results, local research drivers, and unfinished paper
 drafts are excluded.
+
+Maintainers can publish tested wheels and source archives with the
+[release workflow](docs/releasing.md).
 
 ## License
 

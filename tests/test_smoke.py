@@ -8,11 +8,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
 
-from best_arm import ALGO_REGISTRY, Bandit
+from best_arm import ALGO_REGISTRY, Bandit, __version__
 from best_arm.cli import main as cli_main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,25 @@ def make_bandit(name="track_and_stop", distribution="bernoulli"):
 
 
 class PublicAPITests(unittest.TestCase):
+    def test_distribution_version_matches_import(self):
+        self.assertEqual(version("best-arm"), __version__)
+
+    def test_standalone_library_without_project_files(self):
+        script = (ROOT / "examples" / "library_usage.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            completed = subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=temporary,
+                env={**os.environ, "MPLBACKEND": "Agg"},
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+            self.assertIn(f"best_arm version: {__version__}", completed.stdout)
+            self.assertIn("Selected arm:", completed.stdout)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
     def test_fixed_budget_algorithms(self):
         """All supported algorithms return finite, normalized post-bootstrap data."""
         for distribution in ("bernoulli", "gaussian"):

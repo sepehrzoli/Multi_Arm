@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "best_arm"
-version = "0.1.1"
+version = "0.1.2"
 description = "A modular multi-armed bandit framework with algorithms, trackers, and stopping rules."
 readme = "README.md"
 requires-python = ">=3.9,<3.13"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff==0.17.3", "build>=1.2", "setuptools>=77", "wheel"]
+dev = ["ruff==0.17.3", "build>=1.2", "setuptools>=77", "wheel", "twine>=6"]
 
 [project.urls]
 Homepage = "https://github.com/sepehrzoli/Multi_Arm"
